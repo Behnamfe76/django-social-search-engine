@@ -1,20 +1,28 @@
 from rest_framework import serializers
 
-from social_api.models import Industry, Personality
+from social_api.models import ImportBatch, Industry, Personality
 
 
-def industry_id_field():
-    """Keep ``industry_id`` writable in the payload now that ``industry`` is a FK.
+def fk_id_field(source, queryset):
+    """Expose a FK as its ``<name>_id`` while keeping it writable.
 
-    Without this DRF builds a ReadOnlyField for the ``_id`` attname and silently
-    drops the value on write.
+    Without an explicit declaration DRF builds a ReadOnlyField for the ``_id``
+    attname of a relation and silently drops the value on write.
     """
     return serializers.PrimaryKeyRelatedField(
-        source="industry",
-        queryset=Industry.objects.all(),
+        source=source,
+        queryset=queryset,
         required=False,
         allow_null=True,
     )
+
+
+def industry_id_field():
+    return fk_id_field("industry", Industry.objects.all())
+
+
+def import_batch_id_field():
+    return fk_id_field("import_batch", ImportBatch.objects.all())
 
 
 class PersonalityListSerializer(serializers.ModelSerializer):
@@ -32,6 +40,7 @@ class PersonalityListSerializer(serializers.ModelSerializer):
 
 class PersonalityRetrieveSerializer(serializers.ModelSerializer):
     industry_id = industry_id_field()
+    import_batch_id = import_batch_id_field()
 
     class Meta:
         model = Personality
@@ -61,6 +70,7 @@ class PersonalityRetrieveSerializer(serializers.ModelSerializer):
 
 class PersonalityCreateSerializer(serializers.ModelSerializer):
     industry_id = industry_id_field()
+    import_batch_id = import_batch_id_field()
 
     class Meta:
         model = Personality
@@ -89,6 +99,7 @@ class PersonalityCreateSerializer(serializers.ModelSerializer):
 
 class PersonalityUpdateSerializer(serializers.ModelSerializer):
     industry_id = industry_id_field()
+    import_batch_id = import_batch_id_field()
 
     class Meta:
         model = Personality

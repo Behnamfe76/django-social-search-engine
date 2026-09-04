@@ -1,16 +1,20 @@
 from django.db import models
 
+from social_api.models.enums import GenderType
+
 
 class Personality(models.Model):
-    class GenderType(models.TextChoices):
-        UNKNOWN = "unknown", "Unknown"
-        FEMALE = "female", "Female"
-        MALE = "male", "Male"
-        NON_BINARY = "non_binary", "Non-binary"
-        OTHER = "other", "Other"
+    # re-exported so existing ``Personality.GenderType`` references keep working
+    GenderType = GenderType
 
     id = models.AutoField(primary_key=True)
-    import_batch_id = models.IntegerField(null=True, blank=True)
+    import_batch = models.ForeignKey(
+        "ImportBatch",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="personalities",
+    )
     industry = models.ForeignKey(
         "Industry",
         on_delete=models.SET_NULL,
@@ -38,6 +42,30 @@ class Personality(models.Model):
     locations = models.ManyToManyField(
         "Location",
         through="PersonalityLocation",
+        related_name="personalities",
+        blank=True,
+    )
+    skills = models.ManyToManyField(
+        "Skill",
+        through="PersonalitySkill",
+        related_name="personalities",
+        blank=True,
+    )
+    interests = models.ManyToManyField(
+        "Interest",
+        through="PersonalityInterest",
+        related_name="personalities",
+        blank=True,
+    )
+    languages = models.ManyToManyField(
+        "Language",
+        through="PersonalityLanguage",
+        related_name="personalities",
+        blank=True,
+    )
+    certifications = models.ManyToManyField(
+        "Certification",
+        through="PersonalityCertification",
         related_name="personalities",
         blank=True,
     )

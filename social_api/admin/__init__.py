@@ -1,3 +1,16 @@
+from social_api.admin.app.import_batch import ImportBatchAdmin
+from social_api.admin.app.user import UserAdmin
+from social_api.admin.attribute.certification import CertificationAdmin
+from social_api.admin.attribute.inlines import (
+    PersonalityCertificationInline,
+    PersonalityInterestInline,
+    PersonalityLanguageInline,
+    PersonalitySkillInline,
+)
+from social_api.admin.attribute.interest import InterestAdmin
+from social_api.admin.attribute.language import LanguageAdmin
+from social_api.admin.attribute.personality_certification import PersonalityCertificationAdmin
+from social_api.admin.attribute.skill import SkillAdmin
 from social_api.admin.company.company import CompanyAdmin
 from social_api.admin.employment.employment import EmploymentAdmin
 from social_api.admin.employment.employment_level import EmploymentLevelInline
@@ -14,18 +27,29 @@ from social_api.admin.social.social_platform import SocialPlatformAdmin
 from social_api.admin.social.social_profiles import SocialProfilesAdmin
 
 __all__ = [
+    "CertificationAdmin",
     "CompanyAdmin",
     "CompanySocialProfilesAdmin",
     "EmploymentAdmin",
     "EmploymentLevelInline",
+    "ImportBatchAdmin",
     "IndustryAdmin",
+    "InterestAdmin",
+    "LanguageAdmin",
     "LocationAdmin",
     "OccupationAdmin",
     "OccupationLevelAdmin",
     "OccupationRoleAdmin",
     "OccupationSubRoleAdmin",
     "PersonalityAdmin",
+    "PersonalityCertificationAdmin",
+    "PersonalityCertificationInline",
+    "PersonalityInterestInline",
+    "PersonalityLanguageInline",
     "PersonalityLocationAdmin",
+    "PersonalitySkillInline",
+    "SkillAdmin",
     "SocialPlatformAdmin",
     "SocialProfilesAdmin",
+    "UserAdmin",
 ]
