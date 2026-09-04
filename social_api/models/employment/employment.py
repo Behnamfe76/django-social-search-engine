@@ -15,9 +15,27 @@ class Employment(models.Model):
         blank=True,
         related_name="employments",
     )
-    occupation_id = models.IntegerField(null=True, blank=True)
-    occupation_role_id = models.IntegerField(null=True, blank=True)
-    occupation_sub_role_id = models.IntegerField(null=True, blank=True)
+    occupation = models.ForeignKey(
+        "Occupation",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="employments",
+    )
+    occupation_role = models.ForeignKey(
+        "OccupationRole",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="employments",
+    )
+    occupation_sub_role = models.ForeignKey(
+        "OccupationSubRole",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="employments",
+    )
     location = models.ForeignKey(
         "Location",
         on_delete=models.SET_NULL,

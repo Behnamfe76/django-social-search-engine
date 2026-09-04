@@ -1,6 +1,20 @@
 from rest_framework import serializers
 
-from social_api.models import Personality
+from social_api.models import Industry, Personality
+
+
+def industry_id_field():
+    """Keep ``industry_id`` writable in the payload now that ``industry`` is a FK.
+
+    Without this DRF builds a ReadOnlyField for the ``_id`` attname and silently
+    drops the value on write.
+    """
+    return serializers.PrimaryKeyRelatedField(
+        source="industry",
+        queryset=Industry.objects.all(),
+        required=False,
+        allow_null=True,
+    )
 
 
 class PersonalityListSerializer(serializers.ModelSerializer):
@@ -17,6 +31,8 @@ class PersonalityListSerializer(serializers.ModelSerializer):
 
 
 class PersonalityRetrieveSerializer(serializers.ModelSerializer):
+    industry_id = industry_id_field()
+
     class Meta:
         model = Personality
         fields = [
@@ -44,6 +60,8 @@ class PersonalityRetrieveSerializer(serializers.ModelSerializer):
 
 
 class PersonalityCreateSerializer(serializers.ModelSerializer):
+    industry_id = industry_id_field()
+
     class Meta:
         model = Personality
         fields = [
@@ -70,6 +88,8 @@ class PersonalityCreateSerializer(serializers.ModelSerializer):
 
 
 class PersonalityUpdateSerializer(serializers.ModelSerializer):
+    industry_id = industry_id_field()
+
     class Meta:
         model = Personality
         fields = [

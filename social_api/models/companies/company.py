@@ -3,7 +3,13 @@ from django.db import models
 
 class Company(models.Model):
     id = models.AutoField(primary_key=True)
-    industry_id = models.IntegerField(null=True, blank=True)
+    industry = models.ForeignKey(
+        "Industry",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="companies",
+    )
     external_id = models.CharField(
         max_length=255,
         unique=True,

@@ -10,7 +10,11 @@ class EmploymentLevel(models.Model):
         on_delete=models.CASCADE,
         related_name="level_links",
     )
-    occupation_level_id = models.IntegerField()
+    occupation_level = models.ForeignKey(
+        "OccupationLevel",
+        on_delete=models.CASCADE,
+        related_name="employment_links",
+    )
 
     class Meta:
         db_table = "employment_levels"

@@ -11,7 +11,13 @@ class Personality(models.Model):
 
     id = models.AutoField(primary_key=True)
     import_batch_id = models.IntegerField(null=True, blank=True)
-    industry_id = models.IntegerField(null=True, blank=True)
+    industry = models.ForeignKey(
+        "Industry",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="personalities",
+    )
     first_name = models.CharField(max_length=255)
     middle_name = models.CharField(max_length=255, null=True, blank=True)
     middle_initial = models.CharField(max_length=1, null=True, blank=True)
@@ -47,7 +53,6 @@ class Personality(models.Model):
                 fields=["last_name", "first_name"],
                 name="personalities_name_idx",
             ),
-            models.Index(fields=["industry_id"], name="personalities_industry_idx"),
         ]
 
     def __str__(self):

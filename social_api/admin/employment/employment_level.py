@@ -8,4 +8,5 @@ class EmploymentLevelInline(admin.TabularInline):
     as a standalone ModelAdmin, so it is edited inline on Employment instead."""
 
     model = EmploymentLevel
+    autocomplete_fields = ("occupation_level",)
     extra = 0
