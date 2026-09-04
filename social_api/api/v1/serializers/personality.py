@@ -27,4 +27,4 @@ class PersonalitySerializer(serializers.ModelSerializer):
             "updated_at",
             "deleted_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "full_name", "created_at", "updated_at", "deleted_at"]

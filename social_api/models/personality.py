@@ -46,3 +46,15 @@ class Personality(models.Model):
 
     def __str__(self):
         return self.full_name
+
+    def save(self, *args, **kwargs):
+        self.full_name = self.build_full_name()
+        super().save(*args, **kwargs)
+
+    def build_full_name(self):
+        middle = self.middle_name or self.middle_initial
+        return " ".join(
+            part.strip()
+            for part in [self.first_name, middle, self.last_name]
+            if part and part.strip()
+        )
