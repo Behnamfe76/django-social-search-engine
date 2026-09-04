@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -55,7 +56,10 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django_filters",
+    "drf_spectacular",
+    "drf_spectacular_sidecar",
     "rest_framework",
+    "rest_framework_simplejwt",
     "social_api",
 ]
 
@@ -65,6 +69,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "social_api.middleware.JWTRouteAuthMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -116,6 +121,14 @@ DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 
 REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "social_api.api.v1.pagination.DefaultPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_FILTER_BACKENDS": [
@@ -132,6 +145,66 @@ REST_FRAMEWORK = {
         "rest_framework.parsers.FormParser",
         "rest_framework.parsers.MultiPartParser",
     ],
+}
+
+
+# Authentication
+# social_api.User is the project user: email is the identifier and the password
+# column keeps its `password_hash` name from the schema.
+
+AUTH_USER_MODEL = "social_api.User"
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=int(os.environ.get("JWT_ACCESS_MINUTES", "15"))
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=int(os.environ.get("JWT_REFRESH_DAYS", "7"))
+    ),
+    "ROTATE_REFRESH_TOKENS": True,
+    "UPDATE_LAST_LOGIN": True,
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
+
+# Routes guarded by social_api.middleware.JWTRouteAuthMiddleware. Anything whose
+# path starts with a protected prefix needs a valid token, unless it also matches
+# an exempt prefix (exempt wins).
+AUTH_PROTECTED_PREFIXES = env_list("AUTH_PROTECTED_PREFIXES", "/api/")
+AUTH_EXEMPT_PREFIXES = env_list(
+    "AUTH_EXEMPT_PREFIXES",
+    "/api/v1/auth/,/api/v1/health/,/api/schema/,/api/docs/,/api/redoc/,/admin/,/api-auth/",
+)
+
+
+# API documentation (drf-spectacular)
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Social Search Engine API",
+    "DESCRIPTION": (
+        "Search and enrichment API over personalities, their employment history "
+        "and the companies they work for."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SCHEMA_PATH_PREFIX": "/api/v1",
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SORT_OPERATIONS": False,
+    "TAGS": [
+        {"name": "auth", "description": "Registration, login and token lifecycle."},
+        {"name": "personalities", "description": "People records and their attributes."},
+        {"name": "health", "description": "Service liveness."},
+    ],
+    "SWAGGER_UI_SETTINGS": {
+        "persistAuthorization": True,
+        "displayRequestDuration": True,
+    },
+    # Serve the UI assets from the sidecar package instead of a CDN, so the docs
+    # work offline and are not pinned to a moving "@latest".
+    "SWAGGER_UI_DIST": "SIDECAR",
+    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
+    "REDOC_DIST": "SIDECAR",
 }
 
 
@@ -170,6 +243,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 
 # Email

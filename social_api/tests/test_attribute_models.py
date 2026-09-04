@@ -1,5 +1,3 @@
-import unittest
-
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 
@@ -12,21 +10,7 @@ from social_api.models import (
     PersonalityLanguage,
     Skill,
 )
-from social_api.tests.support import tables_exist
 
-ATTRIBUTE_TABLES = (
-    "skills",
-    "personality_skills",
-    "interests",
-    "personality_interests",
-    "languages",
-    "personality_languages",
-    "certifications",
-    "personality_certifications",
-)
-
-
-@unittest.skipUnless(tables_exist(*ATTRIBUTE_TABLES), "attribute tables have no migration yet")
 class PersonalityAttributeTests(TestCase):
     def setUp(self):
         self.person = Personality.objects.create(first_name="Ada", last_name="Lovelace")

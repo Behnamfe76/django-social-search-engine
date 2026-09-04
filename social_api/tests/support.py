@@ -1,14 +1,17 @@
 """Shared test helpers."""
 
-from django.db import connection
+from rest_framework_simplejwt.tokens import RefreshToken
 
 
-def tables_exist(*names):
-    """True when every named table is present in the current database.
+def access_token(user):
+    return str(RefreshToken.for_user(user).access_token)
 
-    Company/Employment have no migration yet, so tests touching them skip instead
-    of erroring on a missing relation.
+
+def authenticate(client, user):
+    """Attach a real Bearer token to an APIClient.
+
+    ``force_authenticate`` is not enough here: JWTRouteAuthMiddleware runs before
+    the view and would reject the request before DRF ever sees it.
     """
-    with connection.cursor() as cursor:
-        existing = set(connection.introspection.table_names(cursor))
-    return set(names) <= existing
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {access_token(user)}")
+    return client

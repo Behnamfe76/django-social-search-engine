@@ -1,13 +1,12 @@
-import unittest
-
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from django.contrib.auth import get_user_model
+
 from social_api.models import ImportBatch, Industry, Personality
-from social_api.tests.support import tables_exist
+from social_api.tests.support import authenticate
 
 
-@unittest.skipUnless(tables_exist("industries"), "industries table has no migration yet")
 class PersonalityIndustryFieldTests(APITestCase):
     """``industry`` is a FK but the API exposes it as ``industry_id``.
 
@@ -16,6 +15,8 @@ class PersonalityIndustryFieldTests(APITestCase):
     """
 
     def setUp(self):
+        authenticate(self.client, get_user_model().objects.create_user(
+            email="tester@example.com", password="pw", name="Tester"))
         self.software = Industry.objects.create(name="Software", slug="software")
         self.finance = Industry.objects.create(name="Finance", slug="finance")
 
@@ -75,11 +76,12 @@ class PersonalityIndustryFieldTests(APITestCase):
         self.assertEqual(response.data["results"][0]["full_name"], "Ada Lovelace")
 
 
-@unittest.skipUnless(tables_exist("import_batches", "users"), "app tables have no migration yet")
 class PersonalityImportBatchFieldTests(APITestCase):
     """Same ``_id``-on-a-FK trap as industry_id; see PersonalityIndustryFieldTests."""
 
     def setUp(self):
+        authenticate(self.client, get_user_model().objects.create_user(
+            email="tester@example.com", password="pw", name="Tester"))
         self.batch = ImportBatch.objects.create(
             source="people-data-labs", filename="batch1.json", row_count=10
         )

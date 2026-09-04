@@ -1,10 +1,7 @@
-import unittest
-
 from django.test import SimpleTestCase, TestCase
 
 from social_api.models import Company
 from social_api.services import build_slug, build_unique_slug
-from social_api.tests.support import tables_exist
 
 
 class BuildSlugTests(SimpleTestCase):
@@ -41,7 +38,6 @@ class BuildSlugTests(SimpleTestCase):
             build_slug("!!!", fallback="???")
 
 
-@unittest.skipUnless(tables_exist("companies"), "companies table has no migration yet")
 class BuildUniqueSlugTests(TestCase):
     def _company(self, name, slug):
         return Company.objects.create(name=name, slug=slug)

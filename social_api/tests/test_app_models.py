@@ -1,10 +1,7 @@
-import unittest
-
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 
 from social_api.models import EmailType, GenderType, ImportBatch, Personality, PhoneType, User
-from social_api.tests.support import tables_exist
 
 
 class EnumTests(TestCase):
@@ -27,28 +24,27 @@ class EnumTests(TestCase):
         self.assertEqual(Personality._meta.get_field("gender").default, GenderType.UNKNOWN)
 
 
-@unittest.skipUnless(tables_exist("users", "import_batches"), "app tables have no migration yet")
 class UserAndImportBatchTests(TestCase):
     def test_user_email_is_unique(self):
-        User.objects.create(name="Ada", email="ada@example.com", password_hash="x")
+        User.objects.create_user(email="ada@example.com", password="pw", name="Ada")
 
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
-                User.objects.create(name="Other", email="ada@example.com", password_hash="y")
+                User.objects.create_user(email="ada@example.com", password="pw", name="Other")
 
     def test_user_optionally_self_links_to_a_personality(self):
         person = Personality.objects.create(first_name="Ada", last_name="Lovelace")
-        user = User.objects.create(
-            name="Ada", email="ada@example.com", password_hash="x", personality=person
+        user = User.objects.create_user(
+            email="ada@example.com", password="pw", name="Ada", personality=person
         )
 
         self.assertEqual(person.users.get(), user)
 
-        unlinked = User.objects.create(name="Bob", email="bob@example.com", password_hash="x")
+        unlinked = User.objects.create_user(email="bob@example.com", password="pw", name="Bob")
         self.assertIsNone(unlinked.personality)
 
     def test_import_batch_links_user_and_personalities(self):
-        user = User.objects.create(name="Ada", email="ada@example.com", password_hash="x")
+        user = User.objects.create_user(email="ada@example.com", password="pw", name="Ada")
         batch = ImportBatch.objects.create(
             user=user, source="people-data-labs", filename="batch1.json", row_count=100
         )
@@ -60,7 +56,7 @@ class UserAndImportBatchTests(TestCase):
         self.assertEqual(batch.personalities.get(), person)
 
     def test_import_batch_survives_user_deletion(self):
-        user = User.objects.create(name="Ada", email="ada@example.com", password_hash="x")
+        user = User.objects.create_user(email="ada@example.com", password="pw", name="Ada")
         batch = ImportBatch.objects.create(user=user, source="pdl", filename="b.json", row_count=1)
 
         user.delete()

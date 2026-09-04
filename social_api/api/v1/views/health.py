@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -8,6 +9,12 @@ class HealthCheckView(APIView):
     authentication_classes = []
     permission_classes = []
 
+    @extend_schema(
+        tags=["health"],
+        summary="Service liveness",
+        responses=HealthCheckSerializer,
+        auth=[],
+    )
     def get(self, request):
         serializer = HealthCheckSerializer(
             {

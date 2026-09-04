@@ -1,5 +1,3 @@
-import unittest
-
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 
@@ -14,21 +12,7 @@ from social_api.models import (
     OccupationSubRole,
     Personality,
 )
-from social_api.tests.support import tables_exist
 
-UNMIGRATED_TABLES = (
-    "companies",
-    "employments",
-    "employment_levels",
-    "industries",
-    "occupations",
-    "occupation_roles",
-    "occupation_sub_roles",
-    "occupation_levels",
-)
-
-
-@unittest.skipUnless(tables_exist(*UNMIGRATED_TABLES), "these tables have no migration yet")
 class EmploymentModelTests(TestCase):
     def setUp(self):
         self.personality = Personality.objects.create(first_name="Ada", last_name="Lovelace")
@@ -86,7 +70,6 @@ class EmploymentModelTests(TestCase):
         self.assertEqual(role.sub_roles.get(), sub_role)
 
 
-@unittest.skipUnless(tables_exist(*UNMIGRATED_TABLES), "these tables have no migration yet")
 class OccupationTaxonomyTests(TestCase):
     def test_industry_links_companies_and_personalities(self):
         industry = Industry.objects.create(name="Software", slug="software")
