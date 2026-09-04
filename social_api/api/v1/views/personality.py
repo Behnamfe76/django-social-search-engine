@@ -1,7 +1,7 @@
 from django.utils import timezone
 from rest_framework import viewsets
-from rest_framework.pagination import PageNumberPagination
 
+from social_api.api.v1.filters import PersonalityFilter
 from social_api.api.v1.serializers import (
     PersonalityCreateSerializer,
     PersonalityListSerializer,
@@ -11,16 +11,9 @@ from social_api.api.v1.serializers import (
 from social_api.selectors.personality import personality_queryset
 
 
-class PersonalityPagination(PageNumberPagination):
-    page_size = 20
-    page_size_query_param = "page_size"
-    max_page_size = 100
-
-
 class PersonalityViewSet(viewsets.ModelViewSet):
     serializer_class = PersonalityRetrieveSerializer
-    pagination_class = PersonalityPagination
-    filterset_fields = ["gender", "industry_id", "import_batch_id"]
+    filterset_class = PersonalityFilter
     search_fields = ["full_name", "first_name", "last_name"]
     ordering_fields = ["id", "full_name", "last_name", "created_at", "updated_at"]
     ordering = ["id"]
