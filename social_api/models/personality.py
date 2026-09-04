@@ -29,6 +29,12 @@ class Personality(models.Model):
     inferred_years_experience = models.SmallIntegerField(null=True, blank=True)
     version_status = models.JSONField(null=True, blank=True)
     location_last_updated = models.DateField(null=True, blank=True)
+    locations = models.ManyToManyField(
+        "Location",
+        through="PersonalityLocation",
+        related_name="personalities",
+        blank=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     deleted_at = models.DateTimeField(null=True, blank=True)

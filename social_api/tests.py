@@ -1,7 +1,7 @@
 from rest_framework import status
 from rest_framework.test import APISimpleTestCase, APITestCase
 
-from social_api.models import Personality
+from social_api.models import Location, Personality, PersonalityLocation
 
 
 class HealthCheckApiTests(APISimpleTestCase):
@@ -116,3 +116,24 @@ class PersonalityApiTests(APITestCase):
         personality.refresh_from_db()
         self.assertIsNotNone(personality.deleted_at)
         self.assertEqual(Personality.objects.filter(deleted_at__isnull=True).count(), 0)
+
+    def test_personality_location_relationships_are_available_from_both_sides(self):
+        personality = Personality.objects.create(
+            first_name="Mary",
+            last_name="Jackson",
+        )
+        location = Location.objects.create(
+            name=Location.LocationName.CITY,
+            locality="Hampton",
+            region="Virginia",
+            country="United States",
+        )
+
+        PersonalityLocation.objects.create(
+            personality=personality,
+            location=location,
+            is_primary=True,
+        )
+
+        self.assertEqual(list(personality.locations.all()), [location])
+        self.assertEqual(list(location.personalities.all()), [personality])

@@ -1,5 +1,4 @@
 from social_api.models.geography.location import Location
 from social_api.models.geography.personality_location import PersonalityLocation
-from social_api.models.personality import Personality
 
-__all__ = ["Location", "Personality", "PersonalityLocation"]
+__all__ = ["Location", "PersonalityLocation"]
