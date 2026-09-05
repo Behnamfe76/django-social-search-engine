@@ -26,16 +26,18 @@ def import_batch_id_field():
 
 
 class PersonalityListSerializer(serializers.ModelSerializer):
+    industry = serializers.SlugRelatedField(slug_field="name", read_only=True)
+
     class Meta:
         model = Personality
         fields = [
             "id",
-            "industry_id",
+            "industry",
             "full_name",
             "gender",
             "created_at",
         ]
-        read_only_fields = fields
+        read_only_fields = ["id", "full_name", "gender", "created_at"]
 
 
 class PersonalityRetrieveSerializer(serializers.ModelSerializer):

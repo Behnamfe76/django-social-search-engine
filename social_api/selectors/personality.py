@@ -4,4 +4,6 @@ from social_api.models import Personality
 
 
 def personality_queryset() -> QuerySet[Personality]:
-    return Personality.objects.filter(deleted_at__isnull=True)
+    return Personality.objects.select_related("industry").filter(
+        deleted_at__isnull=True
+    )
