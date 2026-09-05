@@ -94,6 +94,38 @@ through to `manage.py` inside the container.
 ./sse ctl status               # supervisorctl: `./sse ctl restart worker`
 ```
 
+### Starting over
+
+`./sse reinit` is the equivalent of Laravel's `migrate:fresh` plus the rest of
+the setup. It asks for confirmation first; `--yes` skips the prompt.
+
+```bash
+./sse reinit          # wipe everything and set it up again
+./sse reinit --yes
+```
+
+It stops the worker, purges queued tasks, drops every table, re-runs all
+migrations, deletes every uploaded file, recreates the superuser from `.env`,
+and restarts both processes onto the new schema.
+
+The order matters. The worker is stopped first so nothing is mid-import while
+the tables go, and both processes are restarted afterwards because gunicorn
+holds pooled connections (`CONN_MAX_AGE`) whose cached query plans still refer
+to the tables that were just dropped.
+
+For the database alone, leaving uploads and the queue untouched:
+
+```bash
+./sse migrate:fresh              # or migrate_fresh; both reach the same command
+./sse migrate_fresh --skip-migrate   # drop the tables and stop there
+```
+
+`migrate_fresh` is a real management command
+([`social_api/management/commands/migrate_fresh.py`](social_api/management/commands/migrate_fresh.py)),
+so it works outside Docker too. It refuses to run with `DEBUG` off unless you
+pass `--force`, and prompts with the database name and host unless you pass
+`--noinput`.
+
 For a bare `sse` instead of `./sse`, add `alias sse="$PWD/sse"` to your shell.
 
 ---
@@ -264,7 +296,8 @@ default. `./sse doctor` reports keys that `.env.example` has gained since your
 | Variable | Default | |
 |---|---|---|
 | `DJANGO_SECRET_KEY` | generated | also signs JWTs; must be ≥ 32 bytes |
-| `DJANGO_DEBUG` | `True` | |
+| `DJANGO_DEBUG` | `True` | `migrate_fresh` refuses to run when this is off |
+| `DJANGO_SUPERUSER_EMAIL` / `_NAME` / `_PASSWORD` | – | set the password and `./sse init` and `./sse reinit` create the account for you |
 | `APP_PORT` | `8000` | host port |
 | `APP_UID` / `APP_GID` | `1000` | Linux only: set to `id -u` / `id -g` |
 | `GUNICORN_WORKERS` | `3` | |
@@ -287,7 +320,7 @@ same file works from the host too.
 ./sse test social_api.tests.test_import_chunking
 ```
 
-142 tests. The pipeline ones are worth a look: `test_import_chunking` checks the
+149 tests. The pipeline ones are worth a look: `test_import_chunking` checks the
 splitter against `csv.reader` on pathological quoting, and `test_import_pipeline`
 drives the real Celery tasks inline, including redelivery, deadlock retry and a
 chunk whose retries run out.

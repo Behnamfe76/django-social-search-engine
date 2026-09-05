@@ -26,6 +26,7 @@ sse -- run and drive the Social Search Engine container.
 
   Setup
     ./sse init              first run: write .env, build, start, migrate, seed a superuser
+    ./sse reinit [--yes]    wipe it all and set it up again (destructive)
     ./sse build             rebuild the image
     ./sse doctor            check the host has what it needs
 
@@ -45,6 +46,7 @@ sse -- run and drive the Social Search Engine container.
   Examples
     ./sse makemigrations social_api
     ./sse migrate
+    ./sse migrate:fresh     drop every table and migrate again, leaving files alone
     ./sse createsuperuser
     ./sse shell
 USAGE
@@ -127,6 +129,22 @@ compose_exec() {
 }
 
 manage() { compose_exec python manage.py "$@"; }
+
+manage_with_env() {
+    # usage: manage_with_env KEY=VAL [KEY=VAL ...] -- <manage.py args>
+    #
+    # The container's environment is a snapshot of .env from when it started, so
+    # anything edited since would be silently ignored. These are read from the
+    # .env on disk and injected at exec time instead.
+    local flags=()
+    [ -t 0 ] || flags+=(-T)
+    while [ $# -gt 0 ] && [ "$1" != "--" ]; do
+        flags+=(-e "$1")
+        shift
+    done
+    shift || true
+    "${COMPOSE[@]}" exec "${flags[@]}" "$SERVICE" python manage.py "$@"
+}
 
 app_running() {
     [ -n "$("${COMPOSE[@]}" ps -q "$SERVICE" 2>/dev/null || true)" ]
@@ -219,6 +237,49 @@ cmd_init() {
     summary
 }
 
+cmd_reinit() {
+    require_docker
+    app_running || die "the app is not running -- ./sse up"
+
+    [ "${1:-}" = "--yes" ] || confirm_wipe
+
+    # Stop the worker first: dropping tables under a running import would leave
+    # tasks operating on rows that no longer exist.
+    info "stopping the worker"
+    compose_exec supervisorctl -c "$SUPERVISOR_CONF" stop worker >/dev/null 2>&1 || true
+
+    info "purging queued tasks"
+    compose_exec celery -A social_search_engine purge -f >/dev/null 2>&1 || true
+
+    info "dropping every table and re-running migrations"
+    manage migrate_fresh --noinput
+
+    info "deleting uploaded files"
+    compose_exec sh -c 'rm -rf /app/media/..?* /app/media/.[!.]* /app/media/* 2>/dev/null || true'
+
+    seed_superuser
+
+    # gunicorn keeps connections open (CONN_MAX_AGE), and those still hold
+    # cached plans for the tables that were just dropped. Both processes have to
+    # come back onto the new schema.
+    info "restarting web and worker onto the fresh schema"
+    compose_exec supervisorctl -c "$SUPERVISOR_CONF" restart web worker >/dev/null
+    wait_healthy
+
+    info "reinitialised -- the database is empty and every upload is gone"
+    summary
+}
+
+confirm_wipe() {
+    local database reply
+    database=$(get_env_value POSTGRES_DB)
+    warn "This drops every table in '${database:-social_search_engine}' and deletes every uploaded file."
+    warn "There is no undo. Pass --yes to skip this prompt."
+    printf 'Type yes to continue: '
+    read -r reply || reply=""
+    [ "$reply" = "yes" ] || die "aborted -- nothing was touched"
+}
+
 seed_superuser() {
     if manage shell -c "
 import sys
@@ -231,10 +292,19 @@ sys.exit(0 if get_user_model().objects.filter(is_superuser=True).exists() else 1
 
     if [ -n "$(get_env_value DJANGO_SUPERUSER_PASSWORD)" ]; then
         info "creating the superuser from .env"
-        manage createsuperuser --noinput \
+        manage_with_env \
+            "DJANGO_SUPERUSER_EMAIL=$(get_env_value DJANGO_SUPERUSER_EMAIL)" \
+            "DJANGO_SUPERUSER_NAME=$(get_env_value DJANGO_SUPERUSER_NAME)" \
+            "DJANGO_SUPERUSER_PASSWORD=$(get_env_value DJANGO_SUPERUSER_PASSWORD)" \
+            -- createsuperuser --noinput \
             || warn "could not create it automatically -- run ./sse createsuperuser"
+    elif [ -t 0 ]; then
+        # Falling through silently would leave the admin unreachable, which after
+        # a wipe is indistinguishable from a broken install. Ask now.
+        info "no DJANGO_SUPERUSER_PASSWORD in .env -- creating one interactively"
+        manage createsuperuser || warn "skipped -- run ./sse createsuperuser later"
     else
-        warn "DJANGO_SUPERUSER_PASSWORD is empty in .env -- run ./sse createsuperuser when you want one"
+        warn "no superuser exists and DJANGO_SUPERUSER_PASSWORD is empty -- run ./sse createsuperuser"
     fi
 }
 
@@ -247,6 +317,12 @@ case "$command" in
     help | -h | --help) usage ;;
     doctor)   cmd_doctor ;;
     init)     cmd_init ;;
+    reinit)   cmd_reinit "$@" ;;
+    migrate:fresh)
+        require_docker
+        app_running || die "the app is not running -- ./sse up"
+        manage migrate_fresh "$@"
+        ;;
     build)    require_docker; ensure_env; "${COMPOSE[@]}" build "$@" ;;
     up)       require_docker; ensure_env; "${COMPOSE[@]}" up -d "$@"; wait_healthy; summary ;;
     down)     require_docker; "${COMPOSE[@]}" down "$@" ;;

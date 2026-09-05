@@ -3,6 +3,12 @@
 Read-side query building lives in ``social_api.selectors``.
 """
 
+from social_api.services.database import drop_all_tables, list_tables
 from social_api.services.slug import build_slug, build_unique_slug
 
-__all__ = ["build_slug", "build_unique_slug"]
+__all__ = [
+    "build_slug",
+    "build_unique_slug",
+    "drop_all_tables",
+    "list_tables",
+]
