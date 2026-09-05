@@ -3,8 +3,16 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 
 from social_api.api.v1.views import (
+    CertificationLookupViewSet,
+    CompanyLookupViewSet,
     DashboardView,
     HealthCheckView,
+    IndustryLookupViewSet,
+    InterestLookupViewSet,
+    LanguageLookupViewSet,
+    OccupationLevelLookupViewSet,
+    OccupationRoleLookupViewSet,
+    SkillLookupViewSet,
     ImportBatchViewSet,
     LoginView,
     MeView,
@@ -17,6 +25,20 @@ app_name = "v1"
 router = DefaultRouter()
 router.register("personalities", PersonalityViewSet, basename="personality")
 router.register("imports", ImportBatchViewSet, basename="import")
+
+# Reference lists for the filter widgets. Read-only, cursor-paged 25 at a time.
+router.register("industries", IndustryLookupViewSet, basename="industry")
+router.register("skills", SkillLookupViewSet, basename="skill")
+router.register("interests", InterestLookupViewSet, basename="interest")
+router.register("languages", LanguageLookupViewSet, basename="language")
+router.register("certifications", CertificationLookupViewSet, basename="certification")
+router.register("companies", CompanyLookupViewSet, basename="company")
+router.register(
+    "occupation-roles", OccupationRoleLookupViewSet, basename="occupation-role"
+)
+router.register(
+    "occupation-levels", OccupationLevelLookupViewSet, basename="occupation-level"
+)
 
 # /auth/ is exempt from JWTRouteAuthMiddleware so tokens can be obtained;
 # /auth/me/ re-protects itself with IsAuthenticated.

@@ -11,6 +11,7 @@ from social_api.api.v1.serializers.import_batch import (
     ImportBatchStatusSerializer,
     ImportRowErrorSerializer,
 )
+from social_api.api.v1.serializers.lookup import LookupSerializer
 from social_api.api.v1.serializers.personality import (
     PersonalityCreateSerializer,
     PersonalityListSerializer,
@@ -25,6 +26,7 @@ __all__ = [
     "ImportBatchCreateSerializer",
     "ImportBatchStatusSerializer",
     "ImportRowErrorSerializer",
+    "LookupSerializer",
     "RegisterSerializer",
     "TokenPairResponseSerializer",
     "UserSerializer",
