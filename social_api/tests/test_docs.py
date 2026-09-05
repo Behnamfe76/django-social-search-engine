@@ -45,6 +45,7 @@ class OpenApiSchemaTests(APITestCase):
             "/api/v1/auth/me/",
             "/api/v1/personalities/",
             "/api/v1/personalities/{id}/",
+            "/api/v1/dashboard/",
         ):
             with self.subTest(path=path):
                 self.assertIn(path, paths)
@@ -68,3 +69,10 @@ class OpenApiSchemaTests(APITestCase):
         security = paths["/api/v1/personalities/"]["get"]["security"]
         self.assertIn({"jwtAuth": []}, security)
         self.assertIn({"jwtAuth": []}, paths["/api/v1/auth/me/"]["get"]["security"])
+        self.assertIn({"jwtAuth": []}, paths["/api/v1/dashboard/"]["get"]["security"])
+
+    def test_dashboard_takes_no_query_parameters(self):
+        """It is a fixed snapshot; a documented filter would be a lie."""
+        operation = self._schema()["paths"]["/api/v1/dashboard/"]["get"]
+
+        self.assertEqual(operation.get("parameters", []), [])

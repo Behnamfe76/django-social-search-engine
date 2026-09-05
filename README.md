@@ -316,6 +316,7 @@ Foreign keys are exposed as `<name>_id` and are writable — DRF silently makes 
 | `GET` | `/api/v1/imports/` | ✓ | recent batches |
 | `GET` | `/api/v1/imports/{id}/` | ✓ | progress, for polling |
 | `GET` | `/api/v1/imports/{id}/errors/` | ✓ | rejected rows with reasons |
+| `GET` | `/api/v1/dashboard/` | ✓ | aggregate snapshot, no parameters |
 
 Full schema at `/api/schema/`, browsable at `/api/docs/`.
 

@@ -4,6 +4,7 @@ from social_api.api.v1.serializers.auth import (
     TokenPairResponseSerializer,
     UserSerializer,
 )
+from social_api.api.v1.serializers.dashboard import DashboardSerializer
 from social_api.api.v1.serializers.health import HealthCheckSerializer
 from social_api.api.v1.serializers.import_batch import (
     ImportBatchCreateSerializer,
@@ -18,6 +19,7 @@ from social_api.api.v1.serializers.personality import (
 )
 
 __all__ = [
+    "DashboardSerializer",
     "EmailTokenObtainPairSerializer",
     "HealthCheckSerializer",
     "ImportBatchCreateSerializer",

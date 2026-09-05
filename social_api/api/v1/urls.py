@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 
 from social_api.api.v1.views import (
+    DashboardView,
     HealthCheckView,
     ImportBatchViewSet,
     LoginView,
@@ -29,6 +30,7 @@ auth_urlpatterns = [
 
 urlpatterns = [
     path("health/", HealthCheckView.as_view(), name="health-check"),
+    path("dashboard/", DashboardView.as_view(), name="dashboard"),
     path("auth/", include((auth_urlpatterns, "auth"), namespace="auth")),
     path("", include(router.urls)),
 ]
