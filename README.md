@@ -280,7 +280,9 @@ one layer rather than a rewrite.
 | `search` | case-insensitive match across `full_name`, `first_name`, `last_name` |
 | `full_name` | `icontains` on the full name |
 | `gender` | exact: `male`, `female`, `other`, `unknown` |
-| `industry_id` | exact FK match |
+| `industry_id` | one of the lookup filters — see below |
+| `skill_id` `interest_id` `language_id` `certification_id` | lookup filters over the profile's attributes |
+| `company_id` `occupation_role_id` `occupation_level_id` | lookup filters over the profile's employment history |
 | `import_batch_id` | exact FK match — scopes results to one upload |
 | `birth_year_min` / `birth_year_max` | inclusive range |
 | `ordering` | `id`, `full_name`, `last_name`, `created_at`, `updated_at`; prefix `-` to reverse |
@@ -289,6 +291,19 @@ one layer rather than a rewrite.
 ```bash
 curl "http://localhost:8000/api/v1/personalities/?search=maria&gender=female&ordering=-full_name" \
   -H "Authorization: Bearer $TOKEN"
+```
+
+Every `*_id` filter above pairs with a lookup endpoint of the same name, and the
+profile payloads embed the matching collections (`skills`, `companies`,
+`occupation_roles`, …) as `{id, name}` — so an id read off a profile can be handed
+straight back as a filter value, and a lookup's `count` is exactly the number of
+profiles that filter returns.
+
+Lookup filters repeat rather than take a list, and OR together:
+
+```bash
+curl "http://localhost:8000/api/v1/personalities/?skill_id=12&skill_id=34" \
+  -H "Authorization: Bearer $TOKEN"   # profiles with either skill, listed once
 ```
 
 `search` is DRF's `SearchFilter` over the indexed name columns; the rest are

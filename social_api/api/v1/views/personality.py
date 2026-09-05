@@ -8,7 +8,10 @@ from social_api.api.v1.serializers import (
     PersonalityRetrieveSerializer,
     PersonalityUpdateSerializer,
 )
-from social_api.selectors.personality import personality_queryset
+from social_api.selectors.personality import (
+    personality_queryset,
+    personality_with_lookups,
+)
 
 
 class PersonalityViewSet(viewsets.ModelViewSet):
@@ -25,7 +28,13 @@ class PersonalityViewSet(viewsets.ModelViewSet):
         "partial_update": PersonalityUpdateSerializer,
     }
 
+    # Reads render the embedded lookup collections; writes do not, so they skip
+    # the prefetching those would otherwise pay for.
+    READ_ACTIONS = frozenset({"list", "retrieve"})
+
     def get_queryset(self):
+        if self.action in self.READ_ACTIONS:
+            return personality_with_lookups()
         return personality_queryset()
 
     def get_serializer_class(self):
