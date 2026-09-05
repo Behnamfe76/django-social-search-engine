@@ -121,29 +121,36 @@ sync_env() {
 
 # -- talking to the container ---------------------------------------------
 
+# NOTE: macOS ships bash 3.2, where expanding an EMPTY array as "${arr[@]}"
+# under `set -u` is a fatal error that `|| true` cannot catch -- the script just
+# dies. So nothing here builds up flags in an array; each case is spelled out.
+
 compose_exec() {
-    local flags=()
-    # Without a terminal (CI, a pipe) docker compose must not try to allocate one.
-    [ -t 0 ] || flags+=(-T)
-    "${COMPOSE[@]}" exec "${flags[@]}" "$SERVICE" "$@"
+    # Scripted steps: never allocate a terminal.
+    "${COMPOSE[@]}" exec -T "$SERVICE" "$@"
+}
+
+compose_exec_tty() {
+    # Commands that may prompt or open a REPL, when there is a terminal to use.
+    if [ -t 0 ] && [ -t 1 ]; then
+        "${COMPOSE[@]}" exec "$SERVICE" "$@"
+    else
+        "${COMPOSE[@]}" exec -T "$SERVICE" "$@"
+    fi
 }
 
 manage() { compose_exec python manage.py "$@"; }
+manage_tty() { compose_exec_tty python manage.py "$@"; }
 
-manage_with_env() {
-    # usage: manage_with_env KEY=VAL [KEY=VAL ...] -- <manage.py args>
-    #
+create_superuser_from_env() {
     # The container's environment is a snapshot of .env from when it started, so
-    # anything edited since would be silently ignored. These are read from the
-    # .env on disk and injected at exec time instead.
-    local flags=()
-    [ -t 0 ] || flags+=(-T)
-    while [ $# -gt 0 ] && [ "$1" != "--" ]; do
-        flags+=(-e "$1")
-        shift
-    done
-    shift || true
-    "${COMPOSE[@]}" exec "${flags[@]}" "$SERVICE" python manage.py "$@"
+    # anything edited since would be ignored. Read from the .env on disk and
+    # inject at exec time instead.
+    "${COMPOSE[@]}" exec -T \
+        -e "DJANGO_SUPERUSER_EMAIL=$(get_env_value DJANGO_SUPERUSER_EMAIL)" \
+        -e "DJANGO_SUPERUSER_NAME=$(get_env_value DJANGO_SUPERUSER_NAME)" \
+        -e "DJANGO_SUPERUSER_PASSWORD=$(get_env_value DJANGO_SUPERUSER_PASSWORD)" \
+        "$SERVICE" python manage.py createsuperuser --noinput
 }
 
 app_running() {
@@ -292,17 +299,13 @@ sys.exit(0 if get_user_model().objects.filter(is_superuser=True).exists() else 1
 
     if [ -n "$(get_env_value DJANGO_SUPERUSER_PASSWORD)" ]; then
         info "creating the superuser from .env"
-        manage_with_env \
-            "DJANGO_SUPERUSER_EMAIL=$(get_env_value DJANGO_SUPERUSER_EMAIL)" \
-            "DJANGO_SUPERUSER_NAME=$(get_env_value DJANGO_SUPERUSER_NAME)" \
-            "DJANGO_SUPERUSER_PASSWORD=$(get_env_value DJANGO_SUPERUSER_PASSWORD)" \
-            -- createsuperuser --noinput \
+        create_superuser_from_env \
             || warn "could not create it automatically -- run ./sse createsuperuser"
     elif [ -t 0 ]; then
         # Falling through silently would leave the admin unreachable, which after
         # a wipe is indistinguishable from a broken install. Ask now.
         info "no DJANGO_SUPERUSER_PASSWORD in .env -- creating one interactively"
-        manage createsuperuser || warn "skipped -- run ./sse createsuperuser later"
+        manage_tty createsuperuser || warn "skipped -- run ./sse createsuperuser later"
     else
         warn "no superuser exists and DJANGO_SUPERUSER_PASSWORD is empty -- run ./sse createsuperuser"
     fi
@@ -321,7 +324,7 @@ case "$command" in
     migrate:fresh)
         require_docker
         app_running || die "the app is not running -- ./sse up"
-        manage migrate_fresh "$@"
+        manage_tty migrate_fresh "$@"
         ;;
     build)    require_docker; ensure_env; "${COMPOSE[@]}" build "$@" ;;
     up)       require_docker; ensure_env; "${COMPOSE[@]}" up -d "$@"; wait_healthy; summary ;;
@@ -329,7 +332,7 @@ case "$command" in
     restart)  require_docker; "${COMPOSE[@]}" restart "$@" ;;
     ps)       require_docker; "${COMPOSE[@]}" ps "$@" ;;
     logs)     require_docker; "${COMPOSE[@]}" logs -f --tail=100 "${@:-$SERVICE}" ;;
-    bash | sh) require_docker; app_running || die "the app is not running -- ./sse up"; compose_exec bash ;;
+    bash | sh) require_docker; app_running || die "the app is not running -- ./sse up"; compose_exec_tty bash ;;
     ctl)      require_docker; app_running || die "the app is not running -- ./sse up"; compose_exec supervisorctl -c "$SUPERVISOR_CONF" "$@" ;;
     test)
         require_docker
@@ -339,6 +342,6 @@ case "$command" in
     *)
         require_docker
         app_running || die "the app is not running -- ./sse up"
-        manage "$command" "$@"
+        manage_tty "$command" "$@"
         ;;
 esac
