@@ -13,4 +13,5 @@ python-dotenv==1.2.3
 PyYAML==6.0.3
 redis>=6.0,<7.0
 sqlparse==0.6.0
+watchdog>=6.0,<7.0
 whitenoise>=6.8,<7.0

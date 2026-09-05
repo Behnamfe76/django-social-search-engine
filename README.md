@@ -94,6 +94,40 @@ through to `manage.py` inside the container.
 ./sse ctl status               # supervisorctl: `./sse ctl restart worker`
 ```
 
+### Editing code
+
+The source is bind-mounted, so an edit is inside the container the moment you
+save it — **a rebuild is never needed for Python changes**. The processes do not
+reload on their own though, so either restart them:
+
+```bash
+./sse ctl restart web           # views, serializers, models
+./sse ctl restart web worker    # tasks, or anything under services/imports/
+```
+
+Restarting is not merely tidier than skipping it. gunicorn workers import a
+module the first time a request needs it, so after an edit some workers hold the
+old code and others the new — the same endpoint then answers differently
+depending on which worker takes the request. Either restart, or turn on hot
+reload and stop thinking about it. In `.env`:
+
+```bash
+GUNICORN_RELOAD=true    # gunicorn restarts its workers when a .py file changes
+CELERY_RELOAD=true      # the worker restarts too, via watchmedo
+GUNICORN_WORKERS=1      # pairs well with the reloader
+```
+
+then `docker compose up -d --force-recreate app`. Both are off by default and
+belong in development only. The worker watches just `social_api/` and
+`social_search_engine/` — `/app` also carries the host's `.venv` through the
+bind mount, and watching that would be enormous and pointless. It restarts on
+`SIGTERM`, so a chunk in flight finishes rather than being cut off.
+
+A rebuild (`./sse build && ./sse up`) is only needed for `requirements.txt`, the
+`Dockerfile`, or `docker/supervisord.conf` — that last one is copied into the
+image rather than mounted. Editing `.env` needs a container recreate, since
+`env_file` is read once at start.
+
 ### Starting over
 
 `./sse reinit` is the equivalent of Laravel's `migrate:fresh` plus the rest of

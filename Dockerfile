@@ -7,7 +7,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     GUNICORN_WORKERS=3 \
-    CELERY_CONCURRENCY=4
+    GUNICORN_TIMEOUT=120 \
+    GUNICORN_RELOAD=false \
+    CELERY_CONCURRENCY=4 \
+    CELERY_LOGLEVEL=INFO \
+    CELERY_RELOAD=false
 
 # supervisor runs the two processes; curl backs the container healthcheck.
 RUN apt-get update \
@@ -34,7 +38,8 @@ COPY . .
 # A named volume inherits ownership from the image path it covers, so media and
 # staticfiles have to be chowned here for the app user to write to them.
 RUN mkdir -p /app/media /app/staticfiles \
-    && chown -R app:app /app/media /app/staticfiles
+    && chown -R app:app /app/media /app/staticfiles \
+    && chmod +x /app/docker/web.sh /app/docker/worker.sh
 
 USER app
 
