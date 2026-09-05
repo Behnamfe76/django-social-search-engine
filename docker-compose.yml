@@ -1,4 +1,39 @@
 services:
+  app:
+    # Runs gunicorn and the Celery worker side by side under supervisor; see
+    # docker/supervisord.conf for why they share a container.
+    build:
+      context: .
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    image: social_search_engine_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Inside the compose network the services answer to their own names, while
+      # .env keeps localhost so the same file still works from the host.
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      CELERY_BROKER_URL: redis://redis:6379/0
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+      CELERY_CONCURRENCY: ${CELERY_CONCURRENCY:-4}
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    volumes:
+      # Source is bind-mounted so edits land without a rebuild; uploads and
+      # collected static live in volumes so the container never writes into the
+      # working tree.
+      - .:/app
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   postgres:
     image: postgres:17-alpine
     container_name: social_search_engine_postgres
@@ -17,5 +52,20 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:8-alpine
+    container_name: social_search_engine_redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
+  media_data:
+  static_data:

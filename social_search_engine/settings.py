@@ -65,6 +65,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Serves collected static files from the app process itself, so the container
+    # needs no second web server for the admin CSS or the Swagger assets.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -195,6 +198,10 @@ SPECTACULAR_SETTINGS = {
         {"name": "auth", "description": "Registration, login and token lifecycle."},
         {"name": "personalities", "description": "People records and their attributes."},
         {"name": "health", "description": "Service liveness."},
+        {
+            "name": "imports",
+            "description": "Dataset uploads processed off-request by Celery.",
+        },
     ],
     "SWAGGER_UI_SETTINGS": {
         "persistAuthorization": True,
@@ -244,6 +251,73 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# With DEBUG on, serve straight from each app's static directory so a fresh
+# container works before anyone has run collectstatic.
+WHITENOISE_USE_FINDERS = DEBUG
+
+
+# Media / uploaded files
+# Uploads are held through the storage backend, never as raw paths, so pointing
+# production at S3 is a STORAGES change. Note that local storage only works
+# because the web process and the Celery worker share a filesystem -- the moment
+# they are separate hosts this has to become object storage.
+
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+STORAGES = {
+    "default": {
+        "BACKEND": os.environ.get(
+            "DEFAULT_FILE_STORAGE", "django.core.files.storage.FileSystemStorage"
+        ),
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
+
+# Always spool uploads to disk. The default handler keeps anything under 2.5 MB
+# in memory, and the whole point of this pipeline is that no process ever holds
+# the dataset in RAM.
+FILE_UPLOAD_HANDLERS = ["django.core.files.uploadhandler.TemporaryFileUploadHandler"]
+
+
+# Celery
+# Chunk tasks are idempotent (they claim their row with a conditional UPDATE), so
+# late acks are safe and a lost worker just means the chunk is retried.
+
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+# Deliberately no result backend: completion is tracked by the ImportBatch
+# counters, so nothing ever needs to read a task result back.
+CELERY_RESULT_BACKEND = None
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_TASK_SOFT_TIME_LIMIT = int(os.environ.get("CELERY_TASK_SOFT_TIME_LIMIT", "600"))
+CELERY_TASK_TIME_LIMIT = int(os.environ.get("CELERY_TASK_TIME_LIMIT", "660"))
+# Tests flip this on so tasks run inline; never set it in a real deployment.
+CELERY_TASK_ALWAYS_EAGER = env_bool("CELERY_TASK_ALWAYS_EAGER", False)
+CELERY_TASK_EAGER_PROPAGATES = True
+
+
+# Dataset imports
+# A chunk is a record-aligned byte range. Target size trades parallelism against
+# per-task overhead; it also bounds how much CSV a worker holds at once.
+
+IMPORT_CHUNK_TARGET_BYTES = int(
+    os.environ.get("IMPORT_CHUNK_TARGET_BYTES", str(1024 * 1024))
+)
+IMPORT_CHUNK_MAX_ROWS = int(os.environ.get("IMPORT_CHUNK_MAX_ROWS", "500"))
+# How much the planner reads at a time while scanning for record boundaries.
+IMPORT_SCAN_BLOCK_BYTES = int(
+    os.environ.get("IMPORT_SCAN_BLOCK_BYTES", str(1024 * 1024))
+)
+IMPORT_MAX_UPLOAD_BYTES = int(
+    os.environ.get("IMPORT_MAX_UPLOAD_BYTES", str(2 * 1024**3))
+)
+IMPORT_DELETE_FILE_WHEN_DONE = env_bool("IMPORT_DELETE_FILE_WHEN_DONE", True)
 
 
 # Email

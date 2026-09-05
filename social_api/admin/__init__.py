@@ -1,4 +1,6 @@
 from social_api.admin.app.import_batch import ImportBatchAdmin
+from social_api.admin.app.import_chunk import ImportChunkAdmin, ImportChunkInline
+from social_api.admin.app.import_row_error import ImportRowErrorAdmin
 from social_api.admin.app.user import UserAdmin
 from social_api.admin.attribute.certification import CertificationAdmin
 from social_api.admin.attribute.inlines import (
@@ -33,6 +35,9 @@ __all__ = [
     "EmploymentAdmin",
     "EmploymentLevelInline",
     "ImportBatchAdmin",
+    "ImportChunkAdmin",
+    "ImportChunkInline",
+    "ImportRowErrorAdmin",
     "IndustryAdmin",
     "InterestAdmin",
     "LanguageAdmin",

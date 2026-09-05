@@ -21,6 +21,14 @@ class PersonalityLocation(models.Model):
 
     class Meta:
         db_table = "personality_locations"
+        constraints = [
+            # Re-importing a source file must not stack duplicate links.
+            models.UniqueConstraint(
+                fields=["personality", "location", "street_address"],
+                name="personality_locations_uniq",
+                nulls_distinct=False,
+            ),
+        ]
         indexes = [
             models.Index(
                 fields=["personality", "location", "street_address"],

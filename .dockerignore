@@ -1,0 +1,37 @@
+.git/
+.gitignore
+.idea/
+.vscode/
+
+# The image builds its own dependencies; a host venv would only shadow them.
+.venv/
+venv/
+env/
+ENV/
+
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Runtime data lives in named volumes, never in the image.
+media/
+staticfiles/
+static_root/
+
+# Secrets are passed in at run time via env_file, never baked in.
+.env
+.env.*
+!.env.example
+
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.tox/
+coverage.xml
+*.log
+.DS_Store

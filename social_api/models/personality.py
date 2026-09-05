@@ -8,6 +8,13 @@ class Personality(models.Model):
     GenderType = GenderType
 
     id = models.AutoField(primary_key=True)
+    external_id = models.CharField(
+        max_length=255,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="linkedin_id from the source, falling back to linkedin_username.",
+    )
     import_batch = models.ForeignKey(
         "ImportBatch",
         on_delete=models.SET_NULL,

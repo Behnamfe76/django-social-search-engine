@@ -5,6 +5,11 @@ from social_api.api.v1.serializers.auth import (
     UserSerializer,
 )
 from social_api.api.v1.serializers.health import HealthCheckSerializer
+from social_api.api.v1.serializers.import_batch import (
+    ImportBatchCreateSerializer,
+    ImportBatchStatusSerializer,
+    ImportRowErrorSerializer,
+)
 from social_api.api.v1.serializers.personality import (
     PersonalityCreateSerializer,
     PersonalityListSerializer,
@@ -15,6 +20,9 @@ from social_api.api.v1.serializers.personality import (
 __all__ = [
     "EmailTokenObtainPairSerializer",
     "HealthCheckSerializer",
+    "ImportBatchCreateSerializer",
+    "ImportBatchStatusSerializer",
+    "ImportRowErrorSerializer",
     "RegisterSerializer",
     "TokenPairResponseSerializer",
     "UserSerializer",

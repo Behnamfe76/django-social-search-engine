@@ -1,0 +1,268 @@
+#!/usr/bin/env bash
+#
+# sse -- one entry point for the containerised app.
+#
+# Anything this script does not recognise is handed to manage.py inside the
+# container, so `./sse migrate` is `docker compose exec app python manage.py
+# migrate` and `./sse makemigrations social_api` works the same way.
+
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
+SERVICE=app
+COMPOSE=(docker compose)
+SUPERVISOR_CONF=/etc/supervisor/supervisord.conf
+
+# -- output ----------------------------------------------------------------
+
+info() { printf '\033[36m==>\033[0m %s\n' "$*"; }
+warn() { printf '\033[33m==>\033[0m %s\n' "$*" >&2; }
+die() { printf '\033[31mError:\033[0m %s\n' "$*" >&2; exit 1; }
+
+usage() {
+    cat <<'USAGE'
+sse -- run and drive the Social Search Engine container.
+
+  Setup
+    ./sse init              first run: write .env, build, start, migrate, seed a superuser
+    ./sse build             rebuild the image
+    ./sse doctor            check the host has what it needs
+
+  Lifecycle
+    ./sse up                start everything and wait for health
+    ./sse down [-v]         stop (add -v to drop the database and uploads too)
+    ./sse restart [svc]     restart a compose service
+    ./sse ps                what is running
+    ./sse logs [svc]        follow logs (default: the app container)
+
+  Inside the container
+    ./sse bash              a shell
+    ./sse ctl status        supervisorctl, e.g. `./sse ctl restart worker`
+    ./sse test [labels]     the Django test suite
+    ./sse <command> ...     anything else goes to manage.py
+
+  Examples
+    ./sse makemigrations social_api
+    ./sse migrate
+    ./sse createsuperuser
+    ./sse shell
+USAGE
+}
+
+# -- host checks -----------------------------------------------------------
+
+require_docker() {
+    command -v docker >/dev/null 2>&1 || die "docker is not installed or not on PATH"
+    docker compose version >/dev/null 2>&1 || die "the docker compose plugin is missing"
+    docker info >/dev/null 2>&1 || die "the docker daemon is not running -- start Docker Desktop"
+}
+
+# -- environment file ------------------------------------------------------
+
+random_secret() {
+    if command -v openssl >/dev/null 2>&1; then
+        openssl rand -base64 64 | tr -d '\n=+/' | cut -c1-50
+    else
+        LC_ALL=C tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 50
+    fi
+}
+
+set_env_value() {
+    local key=$1 value=$2 tmp
+    tmp=$(mktemp)
+    # `sed -i` differs between GNU and BSD, so rewrite through a temp file.
+    awk -v k="$key" -v v="$value" '
+        index($0, k "=") == 1 { print k "=" v; found = 1; next }
+        { print }
+        END { if (!found) print k "=" v }
+    ' .env > "$tmp"
+    mv "$tmp" .env
+}
+
+get_env_value() {
+    [ -f .env ] || return 0
+    awk -v k="$1" 'index($0, k "=") == 1 { sub(/^[^=]*=/, ""); print; exit }' .env
+}
+
+ensure_env() {
+    [ -f .env.example ] || die ".env.example is missing; cannot bootstrap .env"
+    if [ ! -f .env ]; then
+        info "no .env found -- creating one from .env.example"
+        cp .env.example .env
+        set_env_value DJANGO_SECRET_KEY "$(random_secret)"
+        info "generated a fresh DJANGO_SECRET_KEY"
+        return 0
+    fi
+    sync_env
+}
+
+sync_env() {
+    # An .env written before a setting existed silently falls back to the code
+    # default. Append what is missing, with the documented value, and never touch
+    # a key that is already set.
+    local added
+    added=$(awk -F= '
+        FNR == NR { if (/^[A-Za-z]/) { key = $1; sub(/^[^=]*=/, ""); want[key] = $0; order[++n] = key } next }
+        /^[A-Za-z]/ { have[$1] = 1 }
+        END { for (i = 1; i <= n; i++) if (!(order[i] in have)) print order[i] "=" want[order[i]] }
+    ' .env.example .env)
+
+    [ -n "$added" ] || return 0
+
+    {
+        printf '\n# Added by `./sse init` from .env.example on %s\n' "$(date +%Y-%m-%d)"
+        printf '%s\n' "$added"
+    } >> .env
+    info "added $(printf '%s\n' "$added" | wc -l | tr -d ' ') missing key(s) to .env from .env.example"
+}
+
+# -- talking to the container ---------------------------------------------
+
+compose_exec() {
+    local flags=()
+    # Without a terminal (CI, a pipe) docker compose must not try to allocate one.
+    [ -t 0 ] || flags+=(-T)
+    "${COMPOSE[@]}" exec "${flags[@]}" "$SERVICE" "$@"
+}
+
+manage() { compose_exec python manage.py "$@"; }
+
+app_running() {
+    [ -n "$("${COMPOSE[@]}" ps -q "$SERVICE" 2>/dev/null || true)" ]
+}
+
+wait_healthy() {
+    local id status tries=${1:-90}
+    info "waiting for the app to report healthy"
+    for _ in $(seq 1 "$tries"); do
+        id=$("${COMPOSE[@]}" ps -q "$SERVICE" 2>/dev/null || true)
+        if [ -n "$id" ]; then
+            status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$id" 2>/dev/null || echo starting)
+            case "$status" in
+                healthy) return 0 ;;
+                unhealthy) die "the app container is unhealthy -- see ./sse logs" ;;
+            esac
+        fi
+        sleep 2
+    done
+    die "timed out waiting for the app -- see ./sse logs"
+}
+
+summary() {
+    local port
+    port=$(get_env_value APP_PORT)
+    port=${port:-8000}
+    cat <<EOF
+
+  API      http://localhost:${port}/api/v1/
+  Docs     http://localhost:${port}/api/docs/
+  Admin    http://localhost:${port}/admin/
+  Health   http://localhost:${port}/api/v1/health/
+
+  ./sse logs      follow the web and worker output
+  ./sse migrate   or any other manage.py command
+EOF
+}
+
+# -- commands --------------------------------------------------------------
+
+cmd_doctor() {
+    command -v docker >/dev/null 2>&1 && info "docker: $(docker --version)" || warn "docker: missing"
+    docker compose version >/dev/null 2>&1 && info "compose: $(docker compose version --short)" || warn "compose: missing"
+    docker info >/dev/null 2>&1 && info "daemon: running" || warn "daemon: not running"
+    if [ -f .env ]; then
+        info ".env: present"
+        check_env_drift
+    else
+        warn ".env: missing (./sse init will write one)"
+    fi
+    app_running && info "app container: up" || warn "app container: not running"
+}
+
+check_env_drift() {
+    # A .env written before a setting was added silently falls back to the code
+    # default, which is the kind of drift that is only ever noticed in production.
+    local missing
+    missing=$(awk -F= '
+        FNR == NR { if (/^[A-Za-z]/) want[$1] = 1; next }
+        /^[A-Za-z]/ { have[$1] = 1 }
+        END { for (k in want) if (!(k in have)) print "    " k }
+    ' .env.example .env | sort)
+    if [ -n "$missing" ]; then
+        warn ".env is missing keys that .env.example now defines (code defaults apply):"
+        printf '%s\n' "$missing" >&2
+    else
+        info ".env: in step with .env.example"
+    fi
+}
+
+cmd_init() {
+    require_docker
+    ensure_env
+
+    info "building the image (first run pulls the base image, so give it a minute)"
+    "${COMPOSE[@]}" build
+
+    info "starting postgres, redis and the app"
+    "${COMPOSE[@]}" up -d
+    wait_healthy
+
+    info "applying migrations"
+    manage migrate --noinput
+
+    info "collecting static files"
+    manage collectstatic --noinput >/dev/null
+
+    seed_superuser
+    info "ready"
+    summary
+}
+
+seed_superuser() {
+    if manage shell -c "
+import sys
+from django.contrib.auth import get_user_model
+sys.exit(0 if get_user_model().objects.filter(is_superuser=True).exists() else 1)
+" >/dev/null 2>&1; then
+        info "a superuser already exists -- leaving it alone"
+        return 0
+    fi
+
+    if [ -n "$(get_env_value DJANGO_SUPERUSER_PASSWORD)" ]; then
+        info "creating the superuser from .env"
+        manage createsuperuser --noinput \
+            || warn "could not create it automatically -- run ./sse createsuperuser"
+    else
+        warn "DJANGO_SUPERUSER_PASSWORD is empty in .env -- run ./sse createsuperuser when you want one"
+    fi
+}
+
+# -- dispatch --------------------------------------------------------------
+
+command=${1:-help}
+[ $# -gt 0 ] && shift || true
+
+case "$command" in
+    help | -h | --help) usage ;;
+    doctor)   cmd_doctor ;;
+    init)     cmd_init ;;
+    build)    require_docker; ensure_env; "${COMPOSE[@]}" build "$@" ;;
+    up)       require_docker; ensure_env; "${COMPOSE[@]}" up -d "$@"; wait_healthy; summary ;;
+    down)     require_docker; "${COMPOSE[@]}" down "$@" ;;
+    restart)  require_docker; "${COMPOSE[@]}" restart "$@" ;;
+    ps)       require_docker; "${COMPOSE[@]}" ps "$@" ;;
+    logs)     require_docker; "${COMPOSE[@]}" logs -f --tail=100 "${@:-$SERVICE}" ;;
+    bash | sh) require_docker; app_running || die "the app is not running -- ./sse up"; compose_exec bash ;;
+    ctl)      require_docker; app_running || die "the app is not running -- ./sse up"; compose_exec supervisorctl -c "$SUPERVISOR_CONF" "$@" ;;
+    test)
+        require_docker
+        app_running || die "the app is not running -- ./sse up"
+        if [ $# -eq 0 ]; then manage test social_api --noinput; else manage test "$@" --noinput; fi
+        ;;
+    *)
+        require_docker
+        app_running || die "the app is not running -- ./sse up"
+        manage "$command" "$@"
+        ;;
+esac

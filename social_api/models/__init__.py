@@ -1,4 +1,6 @@
 from social_api.models.app.import_batch import ImportBatch
+from social_api.models.app.import_chunk import ImportChunk
+from social_api.models.app.import_row_error import ImportRowError
 from social_api.models.app.user import User
 from social_api.models.attribute.certification import Certification
 from social_api.models.attribute.interest import Interest
@@ -33,6 +35,8 @@ __all__ = [
     "EmploymentLevel",
     "GenderType",
     "ImportBatch",
+    "ImportChunk",
+    "ImportRowError",
     "Industry",
     "Interest",
     "Language",

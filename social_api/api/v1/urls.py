@@ -2,13 +2,20 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 
-from social_api.api.v1.views import HealthCheckView, LoginView, MeView, RegisterView
+from social_api.api.v1.views import (
+    HealthCheckView,
+    ImportBatchViewSet,
+    LoginView,
+    MeView,
+    RegisterView,
+)
 from social_api.api.v1.views.personality import PersonalityViewSet
 
 app_name = "v1"
 
 router = DefaultRouter()
 router.register("personalities", PersonalityViewSet, basename="personality")
+router.register("imports", ImportBatchViewSet, basename="import")
 
 # /auth/ is exempt from JWTRouteAuthMiddleware so tokens can be obtained;
 # /auth/me/ re-protects itself with IsAuthenticated.
